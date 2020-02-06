@@ -1,0 +1,8 @@
+* Global Trust Project
+#:Author: Yoav Luft
+
+** Goals
+Two show the relation between conditions of living: poverty, education, violence, corruption, inequality; and confidence in various
+institutions: Churches, Armed Forces, The Press, The Police, The Government, The Parliament
+
+**
