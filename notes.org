@@ -1,8 +1,25 @@
 * Global Trust Project
 #:Author: Yoav Luft
 
+** Preface and initialisms
+
+WVS - World Values Survey, refers to data regarding questions of trust in different countries.
+
 ** Goals
 Two show the relation between conditions of living: poverty, education, violence, corruption, inequality; and confidence in various
 institutions: Churches, Armed Forces, The Press, The Police, The Government, The Parliament
 
-**
+** Methods
+The data is multidimensional, and has several aggregates. I've aggregated data from gapminder by mean value corrosponding
+to WVS periods: Wave 4 - 1999-2004 (WVS not included), Wave 5 - 2005-2009, Wave 6 - 2010-2014, Wave 7 - 2015-2019 (not published).
+From early explorations of the raw data it seems like gapminder data is strongly corrolated between adjacent years, which
+is why I consider these aggregations to be good approximations.
+
+I'll use a combinations of several methods: scatter matrix for comparing data series, categories and node data to display
+low level information (size of point correlates to GDP, GINI index, etc.) and colour coding of countries.
+
+For displaying different times, I will
+
+*** References and ideas
+- Time Curves: https://aviz.fr/~bbach/timecurves/#uploadyourdata
+One problem I have is that WVS has at most two points in time. But I would like to explore whether trends are predictive.
