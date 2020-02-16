@@ -18,8 +18,24 @@ is why I consider these aggregations to be good approximations.
 I'll use a combinations of several methods: scatter matrix for comparing data series, categories and node data to display
 low level information (size of point correlates to GDP, GINI index, etc.) and colour coding of countries.
 
-For displaying different times, I will
+For displaying different times, I will use an adaption of Time Curves
 
 *** References and ideas
 - Time Curves: https://aviz.fr/~bbach/timecurves/#uploadyourdata
 One problem I have is that WVS has at most two points in time. But I would like to explore whether trends are predictive.
+
+*** Data Processing
+Data from WVS was downloaded as R workspaces, and imported into a Pandas Dataframe using appropriate libraries.
+Data about the year in which each country was sample in a wave was taken from website directly. Codings were also taken from the
+website.
+Data from gapminder was downloaded manually.
+For the WVS data set, after selecting the columns of interest and mapping missing values and country codes to names, I had extracted
+only the countries that appear both in wave 5 and wave 6. Of these, I only took these that had data for all questions, narrowing down
+the selection to 32 countries.
+As for gap minder, I narrowed the data to countries that appear in all datasets, to years 1999-2020 and finally I only took the 
+countries that also appear in WVS dataset (after some manual renaming of entries), leaving 31 countries.
+
+
+* Tasks
+** [TODO] How to upload data files with Parcel?
+** [TODO] How to visualize relations of WVS and GapMinder data in respect of time
