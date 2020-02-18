@@ -10,7 +10,7 @@
     "parcel": "^1.12.4"
   },
   "scripts": {
-    "start": "parcel watch src/index.html"
+    "start": "parcel src/index.html"
   },
   "devDependencies": {
     "elm-hot": "^1.1.4",

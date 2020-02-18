@@ -37,5 +37,15 @@ countries that also appear in WVS dataset (after some manual renaming of entries
 
 
 * Tasks
-** [TODO] How to upload data files with Parcel?
-** [TODO] How to visualize relations of WVS and GapMinder data in respect of time
+** [DONE] How to visualize relations of WVS and GapMinder data in respect of time
+Use a method similar to Time Curves
+** [DONE] Display a scatter plot
+** [TODO] Connect related samples
+** [TODO] Split connecting lines to sections, one section per year
+** [TODO] Choose different value sets and data sets
+** [TODO] Label axes properly
+** [TODO] Color code countries
+** [TODO] Filter countries
+** [TODO] Show gapminder trends before and after point
+** [TODO] Display several graphs as scatter matrix
+** [TODO] Aggregate sets
