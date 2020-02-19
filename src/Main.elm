@@ -15,10 +15,12 @@ import IntDict exposing (IntDict)
 import Interpolation
 import List.Extra
 import Maybe.Extra
+import Path exposing (Path)
 import Scale exposing (ContinuousScale)
 import Set
+import Shape
 import Statistics
-import TypedSvg exposing (circle, g, svg)
+import TypedSvg exposing (circle, defs, g, line, marker, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth)
 import TypedSvg.Core exposing (Svg)
@@ -58,6 +60,10 @@ minimalYear =
 
 maximalYear =
     2020
+
+
+arrowMarkerId =
+    "arrow-marker-id"
 
 
 wvsYears =
@@ -119,11 +125,6 @@ yScale entries countries =
         |> Scale.nice 4
 
 
-drawSeries : WVEntries -> GapminderEntries -> Countries -> List (Svg Msg)
-drawSeries values entries countries =
-    []
-
-
 type alias Point =
     { wvs : Float
     , gap : Float
@@ -134,7 +135,7 @@ type alias Point =
 type alias DisplayData =
     { country : String
     , points : List Point
-    , sections : List ( Point, Point )
+    , segments : List Point
     }
 
 
@@ -249,7 +250,6 @@ makeSeries wvsValues gapminderValues countries =
                 |> expandPoints
                 |> pairwise
                 |> List.concatMap (fillBetweenPoints gapSeries)
-                |> pairwise
     in
     countries
         |> List.filterMap getData
@@ -258,22 +258,16 @@ makeSeries wvsValues gapminderValues countries =
             (\{ gapSeries, country, points } ->
                 { points = points
                 , country = country
-                , sections = getSections gapSeries points
+                , segments = getSections gapSeries points
                 }
             )
 
 
-drawPoints : WVEntries -> GapminderEntries -> Countries -> List (Svg Msg)
-drawPoints values entries countries =
+drawPoints : List DisplayData -> ContinuousScale Float -> ContinuousScale Float -> List (Svg Msg)
+drawPoints seriesData xScale_ yScale_ =
     let
-        xScale_ =
-            xScale values countries
-
-        yScale_ =
-            yScale entries countries
-
         drawPoint : Point -> Svg Msg
-        drawPoint {wvs, gap} =
+        drawPoint { wvs, gap } =
             circle
                 [ r 5
                 , fill <| Paint Color.lightBlue
@@ -283,23 +277,71 @@ drawPoints values entries countries =
                 , cy <| Scale.convert yScale_ gap
                 ]
                 []
-
-        seriesData = makeSeries values entries countries
     in
-        List.concatMap (.points >> (List.map drawPoint)) seriesData
+    List.concatMap (.points >> List.map drawPoint) seriesData
+
+
+drawSegments : List DisplayData -> ContinuousScale Float -> ContinuousScale Float -> List (Svg Msg)
+drawSegments data xScale_ yScale_ =
+    let
+        toSubPath : Point -> Maybe ( Float, Float )
+        toSubPath p =
+            Just ( Scale.convert xScale_ p.wvs, Scale.convert yScale_ p.gap )
+
+        toPath : List Point -> Path
+        toPath ps =
+            List.map toSubPath ps
+                |> Shape.line Shape.basisCurveOpen
+
+        drawSegment : Path -> Svg Msg
+        drawSegment path =
+            Path.element
+                path
+                [ stroke <| Paint Color.lightBlue
+                , strokeWidth 3
+                , TypedSvg.Attributes.markerMid <| "url(#" ++ arrowMarkerId ++ ")"
+                , fill <| PaintNone
+                ]
+    in
+    List.map .segments data
+        |> List.map (List.sortBy .t)
+        |> List.map (toPath >> drawSegment)
 
 
 diagram : Model -> Html Msg
 diagram model =
+    let
+        xScale_ =
+            xScale model.currentValues model.countries
+
+        yScale_ =
+            yScale model.currentSeries model.countries
+
+        seriesData =
+            makeSeries model.currentValues model.currentSeries model.countries
+    in
     svg [ viewBox 0 0 w h, HtmlAttr.width w, HtmlAttr.height h ]
-        [ g [ transform [ Translate (padding - 1) (h - padding) ] ]
-            [ Axis.bottom [ Axis.tickCount 10 ] <| xScale model.currentValues model.countries ]
+        [ defs []
+            [ marker
+                [ TypedSvg.Attributes.id arrowMarkerId
+                , viewBox 0 0 10 10
+                , TypedSvg.Attributes.refX "5"
+                , TypedSvg.Attributes.refY "5"
+                , TypedSvg.Attributes.markerWidth <| TypedSvg.Types.Px 6
+                , TypedSvg.Attributes.markerHeight <| TypedSvg.Types.Px 6
+                , TypedSvg.Attributes.orient "auto-start-reverse"
+                ]
+                [ TypedSvg.path [ TypedSvg.Attributes.d "M 0 0 L 10 5 L 0 10 z" ] []
+                ]
+            ]
+        , g [ transform [ Translate (padding - 1) (h - padding) ] ]
+            [ Axis.bottom [ Axis.tickCount 10 ] <| xScale_ ]
         , g [ transform [ Translate (padding - 1) padding ] ]
-            [ Axis.left [ Axis.tickCount 10 ] <| yScale model.currentSeries model.countries ]
+            [ Axis.left [ Axis.tickCount 10 ] <| yScale_ ]
         , g [ transform [ Translate padding padding ], class [ "series" ] ] <|
-            drawSeries model.currentValues model.currentSeries model.countries
+            drawSegments seriesData xScale_ yScale_
         , g [ transform [ Translate padding padding ], class [ "points" ] ] <|
-            drawPoints model.currentValues model.currentSeries model.countries
+            drawPoints seriesData xScale_ yScale_
         ]
 
 
