@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Axis
+import Basics.Extra exposing (inDegrees)
 import Browser
 import Color
 import Data exposing (GapminderEntries, GapminderSeries, WVEntries, WVWaves)
@@ -20,9 +21,9 @@ import Scale exposing (ContinuousScale)
 import Set
 import Shape
 import Statistics
-import TypedSvg exposing (circle, defs, g, line, marker, svg)
+import TypedSvg exposing (circle, defs, g, line, marker, polygon, polyline, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
-import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth)
+import TypedSvg.Attributes.InPx as InPx exposing (cx, cy, r, strokeWidth)
 import TypedSvg.Core exposing (Svg)
 import TypedSvg.Types exposing (Paint(..), Transform(..))
 
@@ -284,28 +285,94 @@ drawPoints seriesData xScale_ yScale_ =
 drawSegments : List DisplayData -> ContinuousScale Float -> ContinuousScale Float -> List (Svg Msg)
 drawSegments data xScale_ yScale_ =
     let
-        toSubPath : Point -> Maybe ( Float, Float )
-        toSubPath p =
-            Just ( Scale.convert xScale_ p.wvs, Scale.convert yScale_ p.gap )
+        distance ( x1, y1 ) ( x2, y2 ) =
+            sqrt <| ((x1 - x2) ^ 2) + ((y1 - y2) ^ 2)
 
-        toPath : List Point -> Path
-        toPath ps =
-            List.map toSubPath ps
-                |> Shape.line Shape.basisCurveOpen
+        toSegment : ( Point, Point ) -> Svg Msg
+        toSegment ( p1, p2 ) =
+            let
+                ( x1, y1 ) =
+                    ( Scale.convert xScale_ p1.wvs, Scale.convert yScale_ p1.gap )
 
-        drawSegment : Path -> Svg Msg
-        drawSegment path =
-            Path.element
-                path
-                [ stroke <| Paint Color.lightBlue
-                , strokeWidth 3
-                , TypedSvg.Attributes.markerMid <| "url(#" ++ arrowMarkerId ++ ")"
-                , fill <| PaintNone
-                ]
+                ( x2, y2 ) =
+                    ( Scale.convert xScale_ p2.wvs, Scale.convert yScale_ p2.gap )
+
+                shift =
+                    5.0
+
+                dx =
+                    x2 - x1
+
+                dy =
+                    y2 - y1
+
+                angle =
+                    atan2 dy dx
+
+                startX =
+                    x1 + (shift * cos angle)
+
+                startY =
+                    y1 + (shift * sin angle)
+
+                endX =
+                    x2 - (shift * cos angle)
+
+                endY =
+                    y2 - (shift * sin angle)
+
+                width =
+                    5.0
+
+                color =
+                    Paint Color.lightBlue
+            in
+            if distance ( startX, startY ) ( endX, endY ) > 0 then
+                g []
+                    [ TypedSvg.line
+                        [ InPx.x1 startX
+                        , InPx.y1 startY
+                        , InPx.x2 endX
+                        , InPx.y2 endY
+                        , strokeWidth width
+                        , stroke color
+                        ]
+                        []
+                    , polygon
+                        [ TypedSvg.Attributes.points [ ( 0.0, 0.0 ), ( 0.0, width ), ( shift, width / 2 ) ]
+                        , transform [
+                         Translate endX ( endY - (width/2))
+                        ,Rotate (inDegrees angle) 0.0 (width / 2)
+                         ]
+                        , fill color
+                        ]
+                        []
+                    , polygon
+                        [ TypedSvg.Attributes.points
+                            [ ( 0.0, 0.0 ), ( shift, width / 2 ), (0.0, width), (shift, width), (shift, 0.0) ]
+                        , transform [
+                         Translate ( startX - shift ) ( startY - (width/2))
+                        ,Rotate (inDegrees angle) ( shift ) (width / 2)
+                         ]
+                        , fill color
+                        ]
+                        []
+                    ]
+
+            else
+                g [] []
+
+        drawPath : List Point -> Svg Msg
+        drawPath pts =
+            g []
+                (pts
+                    |> pairwise
+                    |> List.map toSegment
+                )
     in
     List.map .segments data
         |> List.map (List.sortBy .t)
-        |> List.map (toPath >> drawSegment)
+        |> List.map drawPath
 
 
 diagram : Model -> Html Msg
