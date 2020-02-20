@@ -3,7 +3,7 @@ module Main exposing (main)
 import Axis
 import Basics.Extra exposing (inDegrees)
 import Browser
-import Color
+import Color exposing (Color)
 import Data exposing (GapminderEntries, GapminderSeries, WVEntries, WVWaves)
 import Datasets.Gapminder exposing (gapminderData)
 import Datasets.WVS exposing (wvsData)
@@ -214,15 +214,17 @@ valuesSelector { currentValues } =
                     title
                     (currentValues == accessor wvsData)
             )
-        |> UI.wrappedRow [UI.width <| UI.fill, UI.spacing 4 ]
+        |> UI.wrappedRow [ UI.width <| UI.fill, UI.spacing 4 ]
 
 
 selectCountries : Countries -> Dict String a -> Dict String a
 selectCountries countries =
     Dict.Extra.keepOnly countries
 
-extendScale (minimal, maximal) factor (low, high) =
-    (max minimal (low - (factor * (high - low))), min maximal (high + (factor * (high - low))))
+
+extendScale ( minimal, maximal ) factor ( low, high ) =
+    ( max minimal (low - (factor * (high - low))), min maximal (high + (factor * (high - low))) )
+
 
 xScale : WVEntries -> Countries -> ContinuousScale Float
 xScale entries countries =
@@ -231,7 +233,7 @@ xScale entries countries =
         |> Dict.values
         |> List.concatMap (\{ wave5, wave6 } -> [ wave5, wave6 ])
         |> Statistics.extent
-        |> Maybe.map (extendScale (0, 4) 0.05)
+        |> Maybe.map (extendScale ( 0, 4 ) 0.05)
         |> Maybe.withDefault ( 0, 4.0 )
         |> Scale.linear ( 0, w - 2 * padding )
 
@@ -243,7 +245,7 @@ yScale entries countries =
         |> Dict.values
         |> List.concatMap IntDict.values
         |> Statistics.extent
-        |> Maybe.map (extendScale (0, 100000) 0.10)
+        |> Maybe.map (extendScale ( 0, 100000 ) 0.1)
         |> Maybe.withDefault ( 0, 1.0 )
         |> Scale.linear ( h - 2 * padding, 0 )
         |> Scale.nice 4
@@ -406,97 +408,70 @@ drawPoints seriesData xScale_ yScale_ =
     List.concatMap (.points >> List.map drawPoint) seriesData
 
 
+segment : Float -> ( Float, Float ) -> ( Float, Float ) -> Svg Msg
+segment relative ( x1, y1 ) ( x2, y2 ) =
+    let
+        width =
+            4
+
+        dx =
+            x2 - x1
+
+        dy =
+            y2 - y1
+
+        angle =
+            atan2 dy dx
+
+        baseColor =
+            Color.blue
+
+        hsl =
+            Color.toHsla baseColor
+
+        scale =
+            Scale.linear ( 0, 1 ) ( 0.1, 0.9 )
+
+        segmentColor =
+            Color.fromHsla { hsl | lightness = Scale.convert scale relative, alpha = 0.5 }
+    in
+    TypedSvg.polygon
+        [ TypedSvg.Attributes.points
+            [ ( x1 + (width * sin angle), y1 - (width * cos angle) )
+            , ( x2, y2 )
+            , ( x1 - (width * sin angle), y1 + (width * cos angle) )
+            , ( x1 + ((width / 2) * cos angle), y1 + ((width / 2) * sin angle) )
+            ]
+        , TypedSvg.Attributes.fill <| Paint segmentColor
+        ]
+        []
+
+
 drawSegments : List DisplayData -> ContinuousScale Float -> ContinuousScale Float -> List (Svg Msg)
 drawSegments data xScale_ yScale_ =
     let
-        distance ( x1, y1 ) ( x2, y2 ) =
-            sqrt <| ((x1 - x2) ^ 2) + ((y1 - y2) ^ 2)
-
-        toSegment : ( Point, Point ) -> Svg Msg
-        toSegment ( p1, p2 ) =
+        preparePoints : List Point -> List ( Float, Float, Float )
+        preparePoints pts =
             let
-                ( x1, y1 ) =
-                    ( Scale.convert xScale_ p1.wvs, Scale.convert yScale_ p1.gap )
+                time =
+                    pts
+                        |> List.map (.t >> toFloat)
+                        |> Statistics.extent
+                        |> Maybe.withDefault ( 0, 0 )
 
-                ( x2, y2 ) =
-                    ( Scale.convert xScale_ p2.wvs, Scale.convert yScale_ p2.gap )
+                timeScale =
+                    Scale.linear ( 0, 1 ) time
 
-                shift =
-                    5.0
-
-                dx =
-                    x2 - x1
-
-                dy =
-                    y2 - y1
-
-                angle =
-                    atan2 dy dx
-
-                startX =
-                    x1 + (shift * cos angle)
-
-                startY =
-                    y1 + (shift * sin angle)
-
-                endX =
-                    x2 - (shift * cos angle)
-
-                endY =
-                    y2 - (shift * sin angle)
-
-                width =
-                    5.0
-
-                color =
-                    Paint Color.lightBlue
+                scaleXYT : Point -> ( Float, Float, Float )
+                scaleXYT p =
+                    ( Scale.convert xScale_ p.wvs, Scale.convert yScale_ p.gap, Scale.convert timeScale <| toFloat p.t )
             in
-            if distance ( startX, startY ) ( endX, endY ) > 0 then
-                g []
-                    [ TypedSvg.line
-                        [ InPx.x1 startX
-                        , InPx.y1 startY
-                        , InPx.x2 endX
-                        , InPx.y2 endY
-                        , strokeWidth width
-                        , stroke color
-                        ]
-                        []
-                    , polygon
-                        [ TypedSvg.Attributes.points [ ( 0.0, 0.0 ), ( 0.0, width ), ( shift, width / 2 ) ]
-                        , transform [
-                         Translate endX ( endY - (width/2))
-                        ,Rotate (inDegrees angle) 0.0 (width / 2)
-                         ]
-                        , fill color
-                        ]
-                        []
-                    , polygon
-                        [ TypedSvg.Attributes.points
-                            [ ( 0.0, 0.0 ), ( shift, width / 2 ), (0.0, width), (shift, width), (shift, 0.0) ]
-                        , transform [
-                         Translate ( startX - shift ) ( startY - (width/2))
-                        ,Rotate (inDegrees angle) ( shift ) (width / 2)
-                         ]
-                        , fill color
-                        ]
-                        []
-                    ]
-
-            else
-                g [] []
-
-        drawPath : List Point -> Svg Msg
-        drawPath pts =
-            g []
-                (pts
-                    |> pairwise
-                    |> List.map toSegment
-                )
+            pts
+                |> List.map scaleXYT
     in
     List.map .segments data
         |> List.map (List.sortBy .t)
-        |> List.map drawPath
+        |> List.map (preparePoints >> pairwise >> List.map (\( ( sx, sy, st ), ( ex, ey, _ ) ) -> segment st ( sx, sy ) ( ex, ey )) >> g [])
 
 
 diagram : Model -> Html Msg
