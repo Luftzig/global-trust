@@ -4,7 +4,7 @@ import Axis
 import Basics.Extra exposing (inDegrees)
 import Browser
 import Color exposing (Color)
-import Data exposing (GapminderEntries, GapminderSeries, WVEntries, WVWaves)
+import Data exposing (GapminderData, GapminderEntries, GapminderSeries, WVEntries, WVWaves, WorldValuesData)
 import Datasets.Gapminder exposing (gapminderData)
 import Datasets.WVS exposing (wvsData)
 import Dict exposing (Dict)
@@ -12,21 +12,17 @@ import Dict.Extra
 import Element as UI
 import Element.Background as UIBackground
 import Element.Border as UIBorder
-import Element.Events
 import Element.Font as UIFont
 import Element.Input as UIInput
 import Html exposing (Html)
 import Html.Attributes as HtmlAttr
 import IntDict exposing (IntDict)
-import Interpolation
 import List.Extra
 import Maybe.Extra
-import Path exposing (Path)
 import Scale exposing (ContinuousScale)
 import Set exposing (Set)
-import Shape
 import Statistics
-import TypedSvg exposing (circle, defs, g, line, marker, svg)
+import TypedSvg exposing (circle, defs, g, marker, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth)
 import TypedSvg.Core exposing (Svg)
@@ -53,10 +49,18 @@ type alias Countries =
     Set String
 
 
+type alias Selector from to =
+    { title : String
+    , shortLabel : String
+    , accessor : from -> to
+    }
+
+
 type alias Model =
-    { currentSeries : GapminderEntries
-    , currentValues : WVEntries
-    , countries : Countries
+    { countries : Countries
+    , gapminderSelector : Selector GapminderData GapminderEntries
+    , wvsSelector : Selector WorldValuesData WVEntries
+    , timeExtrapolation : Int
     }
 
 
@@ -76,25 +80,54 @@ wvsYears =
     wvsData.year
 
 
+gapminderSelectors : List (Selector GapminderData GapminderEntries)
+gapminderSelectors =
+    [ { title = "Corruption Index", accessor = .corruption, shortLabel = "corrupt." }
+    , { title = "GDP, in 2011 Dollars", accessor = .gdp, shortLabel = "GDP" }
+    , { title = "Gini Index", accessor = .gini, shortLabel = "gini" }
+    , { title = "Murders, per 100,000", accessor = .murders, shortLabel = "murders" }
+    , { title = "% Below Poverty", accessor = .poverty, shortLabel = "% poor" }
+    ]
+
+
+valuesSelectors : List (Selector WorldValuesData WVEntries)
+valuesSelectors =
+    [ { accessor = .trustInNeighbors, title = "Trust in Neighbors", shortLabel = "trust: neighbors" }
+    , { accessor = .trustInPeopleYouKnow, title = "Trust in the People You Know", shortLabel = "trust: familiar" }
+    , { accessor = .trustInNewPeople, title = "Trust in People You Just Met", shortLabel = "trust: new people" }
+    , { accessor = .trustInDifferentNationality, title = "Trust in People of Different Nationality", shortLabel = "trust: diff. nation" }
+    , { accessor = .trustInDifferentReligion, title = "Trust in People of Different Religion", shortLabel = "trust: diff. religion" }
+    , { accessor = .confidenceInArmedForces, title = "Confidence in the Armed Forces", shortLabel = "confidence: armed forces" }
+    , { accessor = .confidenceInChurches, title = "Confidence in Religious Institutions", shortLabel = "confidence: religion" }
+    , { accessor = .confidenceInMajorCompanies, title = "Confidence in Major Companies", shortLabel = "confidence: companies" }
+    , { accessor = .confidenceInCourts, title = "Confidence in the Courts", shortLabel = "confidence: courts" }
+    , { accessor = .confidenceInGovernment, title = "Confidence in the Government", shortLabel = "confidence: government" }
+    , { accessor = .confidenceInParliament, title = "Confidence in the Parliament", shortLabel = "confidence: parliament" }
+    , { accessor = .confidenceInPolice, title = "Confidence in the Police", shortLabel = "confidence: police" }
+    , { accessor = .confidenceInPress, title = "Confidence in the Press", shortLabel = "confidence: press" }
+    ]
+
+
 init : Model
 init =
-    { currentSeries = gapminderData.gdp
-    , currentValues = wvsData.confidenceInGovernment
-    , countries = Set.fromList <| Dict.keys wvsData.year
+    { countries = Set.fromList <| Dict.keys wvsData.year
+    , gapminderSelector = { title = "GDP, 2011 $", accessor = .gdp, shortLabel = "GDP $" }
+    , wvsSelector = { accessor = .trustInNewPeople, title = "Trust in People You Just Met", shortLabel = "trust: new people" }
+    , timeExtrapolation = 10
     }
 
 
 type Msg
-    = ChangeGapminderSeries GapminderEntries
+    = SelectGapminderEntries (Selector GapminderData GapminderEntries)
     | ToggleCountry Country
-    | ToggleWVS WVEntries
+    | SelectWVSEntries (Selector WorldValuesData WVEntries)
 
 
 update : Msg -> Model -> Model
 update cmd model =
     case cmd of
-        ChangeGapminderSeries series ->
-            { model | currentSeries = series }
+        SelectGapminderEntries selector ->
+            { model | gapminderSelector = selector }
 
         ToggleCountry country ->
             { model
@@ -106,39 +139,40 @@ update cmd model =
                         Set.insert country model.countries
             }
 
-        ToggleWVS wVEntries ->
-            { model | currentValues = wVEntries }
+        SelectWVSEntries selector ->
+            { model | wvsSelector = selector }
 
 
 view : Model -> Html Msg
 view model =
     UI.layout [ UI.width <| UI.fill, UI.height <| UI.fill ] <|
-        UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX ]
+        UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX, UI.padding 5 ]
             [ UI.el [ UI.centerX, UIFont.size 24 ] <| UI.text "Global Trust"
             , UI.row []
                 [ UI.column []
                     [ UI.row []
                         [ gapminderSelector model
-                        , UI.html <| diagram model
+                        , UI.column []
+                            [ drawTitle model
+                            , UI.html <| diagram model
+                            , valuesSelector model
+                            ]
                         ]
-                    , valuesSelector model
                     ]
                 , countriesSelector model
                 ]
             ]
 
 
-gapminderSelectors =
-    [ { title = "Corruption Index", accessor = .corruption }
-    , { title = "GDP", accessor = .gdp }
-    , { title = "GINI Index", accessor = .gini }
-    , { title = "Murders, per 100,000", accessor = .murders }
-    , { title = "% Below Poverty", accessor = .poverty }
-    ]
-
-
 colorToUi =
     UI.fromRgb << Color.toRgba
+
+
+drawTitle model =
+    UI.row [ UI.width <| UI.fill, UI.centerX, UI.spaceEvenly ]
+        [ UI.el [] <| UI.none
+        , UI.el [ UI.centerX ] <| UI.text <| model.wvsSelector.title ++ " vs. " ++ model.gapminderSelector.title
+        ]
 
 
 button : Msg -> String -> Bool -> UI.Element Msg
@@ -164,11 +198,11 @@ gapminderSelector : Model -> UI.Element Msg
 gapminderSelector model =
     gapminderSelectors
         |> List.map
-            (\{ title, accessor } ->
+            (\({ title, accessor } as selector) ->
                 button
-                    (ChangeGapminderSeries <| accessor gapminderData)
+                    (SelectGapminderEntries selector)
                     title
-                    (accessor gapminderData == model.currentSeries)
+                    (title == model.gapminderSelector.title)
             )
         |> UI.column []
 
@@ -201,31 +235,14 @@ countriesSelector { countries } =
         |> UI.column [ UI.spacing 2 ]
 
 
-valuesSelectors =
-    [ { accessor = .trustInNeighbors, title = "Trust in Neighbors" }
-    , { accessor = .trustInPeopleYouKnow, title = "Trust in the People You Know" }
-    , { accessor = .trustInNewPeople, title = "Trust in People You Just Met" }
-    , { accessor = .trustInDifferentNationality, title = "Trust in People of Different Nationality" }
-    , { accessor = .trustInDifferentReligion, title = "Trust in People of Different Religion" }
-    , { accessor = .confidenceInArmedForces, title = "Confidence in the Armed Forces" }
-    , { accessor = .confidenceInChurches, title = "Confidence in Religious Institutions" }
-    , { accessor = .confidenceInMajorCompanies, title = "Confidence in Major Companies" }
-    , { accessor = .confidenceInCourts, title = "Confidence in the Courts" }
-    , { accessor = .confidenceInGovernment, title = "Confidence in the Government" }
-    , { accessor = .confidenceInParliament, title = "Confidence in the Parliament" }
-    , { accessor = .confidenceInPolice, title = "Confidence in the Police" }
-    , { accessor = .confidenceInPress, title = "Confidence in the Press" }
-    ]
-
-
-valuesSelector { currentValues } =
+valuesSelector { wvsSelector } =
     valuesSelectors
         |> List.map
-            (\{ accessor, title } ->
+            (\({ accessor, title } as selector) ->
                 button
-                    (ToggleWVS <| accessor wvsData)
+                    (SelectWVSEntries selector)
                     title
-                    (currentValues == accessor wvsData)
+                    (title == wvsSelector.title)
             )
         |> UI.wrappedRow [ UI.width <| UI.fill, UI.spacing 4 ]
 
@@ -500,14 +517,20 @@ drawSegments data xScale_ yScale_ =
 diagram : Model -> Html Msg
 diagram model =
     let
+        currentWVS =
+            model.wvsSelector.accessor wvsData
+
+        currentGapminder =
+            model.gapminderSelector.accessor gapminderData
+
         xScale_ =
-            xScale model.currentValues model.countries
+            xScale currentWVS model.countries
 
         yScale_ =
-            yScale model.currentSeries model.countries
+            yScale currentGapminder model.countries
 
         seriesData =
-            makeSeries model.currentValues model.currentSeries model.countries
+            makeSeries currentWVS currentGapminder model.countries
     in
     svg [ viewBox 0 0 w h, HtmlAttr.width w, HtmlAttr.height h ]
         [ defs []
