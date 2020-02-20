@@ -221,6 +221,8 @@ selectCountries : Countries -> Dict String a -> Dict String a
 selectCountries countries =
     Dict.Extra.keepOnly countries
 
+extendScale (minimal, maximal) factor (low, high) =
+    (max minimal (low - (factor * (high - low))), min maximal (high + (factor * (high - low))))
 
 xScale : WVEntries -> Countries -> ContinuousScale Float
 xScale entries countries =
@@ -229,7 +231,8 @@ xScale entries countries =
         |> Dict.values
         |> List.concatMap (\{ wave5, wave6 } -> [ wave5, wave6 ])
         |> Statistics.extent
-        |> Maybe.withDefault ( 0, 0.1 )
+        |> Maybe.map (extendScale (0, 4) 0.05)
+        |> Maybe.withDefault ( 0, 4.0 )
         |> Scale.linear ( 0, w - 2 * padding )
 
 
@@ -240,6 +243,7 @@ yScale entries countries =
         |> Dict.values
         |> List.concatMap IntDict.values
         |> Statistics.extent
+        |> Maybe.map (extendScale (0, 100000) 0.10)
         |> Maybe.withDefault ( 0, 1.0 )
         |> Scale.linear ( h - 2 * padding, 0 )
         |> Scale.nice 4
