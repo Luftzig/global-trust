@@ -25,7 +25,7 @@ import Statistics
 import TypedSvg exposing (circle, defs, g, marker, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth)
-import TypedSvg.Core exposing (Svg)
+import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (Paint(..), Transform(..))
 
 
@@ -55,6 +55,8 @@ type alias Selector from to =
     { title : String
     , shortLabel : String
     , accessor : from -> to
+    , lowLabel : String
+    , highLabel : String
     }
 
 
@@ -84,29 +86,29 @@ wvsYears =
 
 gapminderSelectors : List (Selector GapminderData GapminderEntries)
 gapminderSelectors =
-    [ { title = "Corruption Index", accessor = .corruption, shortLabel = "corrupt." }
-    , { title = "GDP, in 2011 Dollars", accessor = .gdp, shortLabel = "GDP" }
-    , { title = "Gini Index", accessor = .gini, shortLabel = "gini" }
-    , { title = "Murders, per 100,000", accessor = .murders, shortLabel = "murders" }
-    , { title = "% Below Poverty", accessor = .poverty, shortLabel = "% poor" }
+    [ { title = "Corruption Index", accessor = .corruption, shortLabel = "corrupt.", lowLabel = "more corrupt", highLabel = "less corrupt" }
+    , { title = "GDP, in 2011 Dollars", accessor = .gdp, shortLabel = "GDP", lowLabel = "", highLabel = "$" }
+    , { title = "Gini Index", accessor = .gini, shortLabel = "gini", lowLabel = "more equal", highLabel = "less equal" }
+    , { title = "Murders, per 100,000", accessor = .murders, shortLabel = "murders", lowLabel = "", highLabel = "per 100k" }
+    , { title = "% Below Poverty", accessor = .poverty, shortLabel = "% poor", lowLabel = "", highLabel = "%" }
     ]
 
 
 valuesSelectors : List (Selector WorldValuesData WVEntries)
 valuesSelectors =
-    [ { accessor = .trustInNeighbors, title = "Trust in Neighbors", shortLabel = "trust: neighbors" }
-    , { accessor = .trustInPeopleYouKnow, title = "Trust in the People You Know", shortLabel = "trust: familiar" }
-    , { accessor = .trustInNewPeople, title = "Trust in People You Just Met", shortLabel = "trust: new people" }
-    , { accessor = .trustInDifferentNationality, title = "Trust in People of Different Nationality", shortLabel = "trust: diff. nation" }
-    , { accessor = .trustInDifferentReligion, title = "Trust in People of Different Religion", shortLabel = "trust: diff. religion" }
-    , { accessor = .confidenceInArmedForces, title = "Confidence in the Armed Forces", shortLabel = "confidence: armed forces" }
-    , { accessor = .confidenceInChurches, title = "Confidence in Religious Institutions", shortLabel = "confidence: religion" }
-    , { accessor = .confidenceInMajorCompanies, title = "Confidence in Major Companies", shortLabel = "confidence: companies" }
-    , { accessor = .confidenceInCourts, title = "Confidence in the Courts", shortLabel = "confidence: courts" }
-    , { accessor = .confidenceInGovernment, title = "Confidence in the Government", shortLabel = "confidence: government" }
-    , { accessor = .confidenceInParliament, title = "Confidence in the Parliament", shortLabel = "confidence: parliament" }
-    , { accessor = .confidenceInPolice, title = "Confidence in the Police", shortLabel = "confidence: police" }
-    , { accessor = .confidenceInPress, title = "Confidence in the Press", shortLabel = "confidence: press" }
+    [ { accessor = .trustInNeighbors, title = "Trust in Neighbors", shortLabel = "trust: neighbors", lowLabel = "less trust", highLabel = "more trust" }
+    , { accessor = .trustInPeopleYouKnow, title = "Trust in the People You Know", shortLabel = "trust: familiar", lowLabel = "less trust", highLabel = "more trust" }
+    , { accessor = .trustInNewPeople, title = "Trust in People You Just Met", shortLabel = "trust: new people", lowLabel = "less trust", highLabel = "more trust" }
+    , { accessor = .trustInDifferentNationality, title = "Trust in People of Different Nationality", shortLabel = "trust: diff. nation", lowLabel = "less trust", highLabel = "more trust" }
+    , { accessor = .trustInDifferentReligion, title = "Trust in People of Different Religion", shortLabel = "trust: diff. religion", lowLabel = "less trust", highLabel = "more trust" }
+    , { accessor = .confidenceInArmedForces, title = "Confidence in the Armed Forces", shortLabel = "confidence: armed forces", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInChurches, title = "Confidence in Religious Institutions", shortLabel = "confidence: religion", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInMajorCompanies, title = "Confidence in Major Companies", shortLabel = "confidence: companies", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInCourts, title = "Confidence in the Courts", shortLabel = "confidence: courts", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInGovernment, title = "Confidence in the Government", shortLabel = "confidence: government", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInParliament, title = "Confidence in the Parliament", shortLabel = "confidence: parliament", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInPolice, title = "Confidence in the Police", shortLabel = "confidence: police", lowLabel = "less confidence", highLabel = "more confidence" }
+    , { accessor = .confidenceInPress, title = "Confidence in the Press", shortLabel = "confidence: press", lowLabel = "less confidence", highLabel = "more confidence" }
     ]
 
 
@@ -160,8 +162,8 @@ allCountries =
 init : Model
 init =
     { countries = Set.fromList <| Dict.keys wvsData.year
-    , gapminderSelector = { title = "GDP, 2011 $", accessor = .gdp, shortLabel = "GDP $" }
-    , wvsSelector = { accessor = .trustInNewPeople, title = "Trust in People You Just Met", shortLabel = "trust: new people" }
+    , gapminderSelector = List.head gapminderSelectors |> Maybe.withDefault { title = "", accessor = .gdp, shortLabel = "", lowLabel = "", highLabel = "" }
+    , wvsSelector = List.head valuesSelectors |> Maybe.withDefault { accessor = .trustInNewPeople, title = "", shortLabel = "", lowLabel = "", highLabel = "" }
     , timeExtrapolation = 10
     }
 
@@ -261,7 +263,7 @@ gapminderSelector model =
                     title
                     (title == model.gapminderSelector.title)
             )
-        |> UI.column []
+        |> UI.column [ UI.spacing 4 ]
 
 
 countryButton : Msg -> Country -> Bool -> UI.Element Msg
@@ -621,9 +623,35 @@ diagram model =
                 ]
             ]
         , g [ transform [ Translate (padding - 1) (h - padding) ] ]
-            [ Axis.bottom [ Axis.tickCount 10 ] <| xScale_ ]
+            [ Axis.bottom [ Axis.tickCount 10 ] <| xScale_
+            , TypedSvg.text_
+                [ transform [ Translate 0 30 ]
+                , TypedSvg.Attributes.InPx.fontSize 12
+                , TypedSvg.Attributes.textAnchor TypedSvg.Types.AnchorStart
+                ]
+                [ text model.wvsSelector.lowLabel ]
+            , TypedSvg.text_
+                [ transform [ Translate (h + 180) 30 ]
+                , TypedSvg.Attributes.InPx.fontSize 12
+                , TypedSvg.Attributes.textAnchor TypedSvg.Types.AnchorEnd
+                ]
+                [ text model.wvsSelector.highLabel ]
+            ]
         , g [ transform [ Translate (padding - 1) padding ] ]
-            [ Axis.left [ Axis.tickCount 10 ] <| yScale_ ]
+            [ Axis.left [ Axis.tickCount 10 ] <| yScale_
+            , TypedSvg.text_
+                [ transform [ Translate 0 -10 ]
+                , TypedSvg.Attributes.InPx.fontSize 11
+                , TypedSvg.Attributes.textAnchor TypedSvg.Types.AnchorEnd
+                ]
+                [ text model.gapminderSelector.highLabel ]
+            , TypedSvg.text_
+                [ transform [ Translate 0 (h - 105) ]
+                , TypedSvg.Attributes.InPx.fontSize 11
+                , TypedSvg.Attributes.textAnchor TypedSvg.Types.AnchorEnd
+                ]
+                [ text model.gapminderSelector.lowLabel ]
+            ]
         , g [ transform [ Translate padding padding ], class [ "series" ] ] <|
             drawSegments seriesData xScale_ yScale_
         , g [ transform [ Translate padding padding ], class [ "points" ] ] <|
