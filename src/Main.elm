@@ -42,7 +42,9 @@ padding =
 
 
 type alias Country =
-    String
+    { name : String
+    , color : Color
+    }
 
 
 type alias Countries =
@@ -108,6 +110,53 @@ valuesSelectors =
     ]
 
 
+colors =
+    { southAmerica = Color.orange
+    , northAmerica = Color.red
+    , europe = Color.blue
+    , asia = Color.green
+    , africa = Color.purple
+    , oceania = Color.lightBrown
+    }
+
+
+allCountries : List Country
+allCountries =
+    [ { name = "Argentina", color = colors.southAmerica }
+    , { name = "Australia", color = colors.oceania }
+    , { name = "Brazil", color = colors.southAmerica }
+    , { name = "Chile", color = colors.southAmerica }
+    , { name = "China", color = colors.asia }
+    , { name = "Colombia", color = colors.southAmerica }
+    , { name = "Cyprus", color = colors.europe }
+    , { name = "Georgia", color = colors.europe }
+    , { name = "Germany", color = colors.europe }
+    , { name = "Ghana", color = colors.africa }
+    , { name = "India", color = colors.asia }
+    , { name = "Jordan", color = colors.asia }
+    , { name = "Malaysia", color = colors.asia }
+    , { name = "Mexico", color = colors.northAmerica }
+    , { name = "Morocco", color = colors.africa }
+    , { name = "Netherlands", color = colors.europe }
+    , { name = "Peru", color = colors.southAmerica }
+    , { name = "Poland", color = colors.europe }
+    , { name = "Romania", color = colors.europe }
+    , { name = "Russia", color = colors.asia }
+    , { name = "Slovenia", color = colors.europe }
+    , { name = "South Africa", color = colors.africa }
+    , { name = "South Korea", color = colors.asia }
+    , { name = "Spain", color = colors.europe }
+    , { name = "Sweden", color = colors.europe }
+    , { name = "Taiwan", color = colors.asia }
+    , { name = "Thailand", color = colors.asia }
+    , { name = "Trinidad", color = colors.southAmerica }
+    , { name = "Turkey", color = colors.asia }
+    , { name = "Ukraine", color = colors.europe }
+    , { name = "United States", color = colors.northAmerica }
+    , { name = "Uruguay", color = colors.southAmerica }
+    ]
+
+
 init : Model
 init =
     { countries = Set.fromList <| Dict.keys wvsData.year
@@ -120,6 +169,8 @@ init =
 type Msg
     = SelectGapminderEntries (Selector GapminderData GapminderEntries)
     | ToggleCountry Country
+    | SelectAllCountries
+    | DeselectAllCountries
     | SelectWVSEntries (Selector WorldValuesData WVEntries)
 
 
@@ -132,15 +183,21 @@ update cmd model =
         ToggleCountry country ->
             { model
                 | countries =
-                    if Set.member country model.countries then
-                        Set.remove country model.countries
+                    if Set.member country.name model.countries then
+                        Set.remove country.name model.countries
 
                     else
-                        Set.insert country model.countries
+                        Set.insert country.name model.countries
             }
 
         SelectWVSEntries selector ->
             { model | wvsSelector = selector }
+
+        SelectAllCountries ->
+            { model | countries = Set.fromList <| List.map .name allCountries }
+
+        DeselectAllCountries ->
+            { model | countries = Set.empty }
 
 
 view : Model -> Html Msg
@@ -207,31 +264,43 @@ gapminderSelector model =
         |> UI.column []
 
 
-countryButton : Msg -> String -> Bool -> UI.Element Msg
-countryButton msg label active =
+countryButton : Msg -> Country -> Bool -> UI.Element Msg
+countryButton msg country active =
     UIInput.button
         [ UIBorder.rounded 5
-        , UIBorder.color <| colorToUi Color.lightBlue
+        , UIBorder.color <| colorToUi country.color
         , UIBorder.width 2
         , UI.padding 4
         , if active then
-            UIBackground.color <| colorToUi Color.lightBlue
+            UIBackground.color <| colorToUi country.color
 
           else
             UIBackground.color <| UI.rgba 1.0 1.0 1.0 0.0
         , UIFont.size 10
         ]
         { onPress = Just msg
-        , label = UI.text label
+        , label = UI.text country.name
         }
 
 
 countriesSelector { countries } =
-    Dict.keys wvsYears
+    let
+        buttonsProps =
+            [ UIFont.size 10
+            , UIFont.underline
+            ]
+    in
+    allCountries
         |> List.map
             (\c ->
-                countryButton (ToggleCountry c) c (Set.member c countries)
+                countryButton (ToggleCountry c) c (Set.member c.name countries)
             )
+        |> List.append
+            [ UI.row [ UI.spaceEvenly, UI.spacing 5 ]
+                [ UIInput.button buttonsProps { label = UI.text "All", onPress = Just SelectAllCountries }
+                , UIInput.button buttonsProps { label = UI.text "None", onPress = Just DeselectAllCountries }
+                ]
+            ]
         |> UI.column [ UI.spacing 2 ]
 
 
@@ -289,7 +358,7 @@ type alias Point =
 
 
 type alias DisplayData =
-    { country : String
+    { country : Country
     , points : List Point
     , segments : List Point
     }
@@ -300,16 +369,6 @@ pairwise l =
     case Maybe.map2 List.Extra.zip (Just l) (List.tail l) of
         Just l_ ->
             l_
-
-        Nothing ->
-            []
-
-
-listFromMaybe : Maybe a -> List a
-listFromMaybe a =
-    case a of
-        Just a_ ->
-            [ a_ ]
 
         Nothing ->
             []
@@ -335,9 +394,9 @@ makeSeries wvsValues gapminderValues countries =
                     , country = c
                     }
                 )
-                (Dict.get country wvsValues)
-                (Dict.get country gapminderValues)
-                (Dict.get country wvsYears)
+                (Dict.get country.name wvsValues)
+                (Dict.get country.name gapminderValues)
+                (Dict.get country.name wvsYears)
                 (Just country)
 
         addPoints : { wvsWaves : WVWaves Float, gapSeries : GapminderSeries, years : WVWaves Int, country : Country } -> { wvsWaves : WVWaves Float, gapSeries : GapminderSeries, years : WVWaves Int, country : Country, points : List Point }
@@ -415,10 +474,9 @@ makeSeries wvsValues gapminderValues countries =
                 |> pairwise
                 |> List.concatMap (fillBetweenPoints gapSeries)
                 |> List.sortBy .t
-                |> Debug.log "sections"
     in
-    countries
-        |> Set.toList
+    allCountries
+        |> List.filter (\c -> Set.member c.name countries)
         |> List.filterMap getData
         |> List.map addPoints
         |> List.map
@@ -433,11 +491,11 @@ makeSeries wvsValues gapminderValues countries =
 drawPoints : List DisplayData -> ContinuousScale Float -> ContinuousScale Float -> List (Svg Msg)
 drawPoints seriesData xScale_ yScale_ =
     let
-        drawPoint : Point -> Svg Msg
-        drawPoint { wvs, gap } =
+        drawPoint : Country -> Point -> Svg Msg
+        drawPoint country { wvs, gap } =
             circle
                 [ r 5
-                , fill <| Paint Color.lightBlue
+                , fill <| Paint country.color
                 , stroke <| Paint Color.darkGray
                 , strokeWidth 1
                 , cx <| Scale.convert xScale_ wvs
@@ -445,11 +503,12 @@ drawPoints seriesData xScale_ yScale_ =
                 ]
                 []
     in
-    List.concatMap (.points >> List.map drawPoint) seriesData
+    seriesData
+        |> List.concatMap (\series -> List.map (drawPoint series.country) series.points)
 
 
-segment : Float -> ( Float, Float ) -> ( Float, Float ) -> Svg Msg
-segment relative ( x1, y1 ) ( x2, y2 ) =
+segment : Country -> Float -> ( Float, Float ) -> ( Float, Float ) -> Svg Msg
+segment country relative ( x1, y1 ) ( x2, y2 ) =
     let
         width =
             4
@@ -464,7 +523,7 @@ segment relative ( x1, y1 ) ( x2, y2 ) =
             atan2 dy dx
 
         baseColor =
-            Color.blue
+            country.color
 
         hsl =
             Color.toHsla baseColor
@@ -508,10 +567,19 @@ drawSegments data xScale_ yScale_ =
             in
             pts
                 |> List.map scaleXYT
+
+        drawSegments_ country =
+            preparePoints
+                >> pairwise
+                >> List.map (\( ( sx, sy, st ), ( ex, ey, _ ) ) -> segment country st ( sx, sy ) ( ex, ey ))
+                >> g []
+
+        drawSeries : DisplayData -> Svg Msg
+        drawSeries { segments, country } =
+            drawSegments_ country segments
     in
-    List.map .segments data
-        |> List.map (List.sortBy .t)
-        |> List.map (preparePoints >> pairwise >> List.map (\( ( sx, sy, st ), ( ex, ey, _ ) ) -> segment st ( sx, sy ) ( ex, ey )) >> g [])
+    data
+        |> List.map drawSeries
 
 
 diagram : Model -> Html Msg

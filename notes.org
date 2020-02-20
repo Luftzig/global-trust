@@ -44,7 +44,7 @@ Use a method similar to Time Curves
 ** [DONE] Split connecting lines to sections, one section per year
 ** [DONE] Choose different value sets and data sets
 ** [TODO] Label axes properly
-** [TODO] Color code countries
+** [DONE] Color code countries
 ** [DONE] Filter countries
 ** [TODO] Hover tooltips
 ** [TODO] Show gapminder trends before and after point
