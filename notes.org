@@ -43,10 +43,11 @@ Use a method similar to Time Curves
 ** [DONE] Connect related samples
 ** [DONE] Split connecting lines to sections, one section per year
 ** [DONE] Choose different value sets and data sets
-** [TODO] Label axes properly
+** [DONE] Label axes properly
 ** [DONE] Color code countries
 ** [DONE] Filter countries
-** [TODO] Hover tooltips
-** [TODO] Show gapminder trends before and after point
+** [DONE] Hover tooltips
+** [DONE] Show gapminder trends before and after point
+** [TODO] Control amount of gapminder before and after
 ** [TODO] Display several graphs as scatter matrix
 ** [TODO] Aggregate sets

@@ -4,6 +4,7 @@ import Axis
 import Basics.Extra exposing (inDegrees)
 import Browser
 import Color exposing (Color)
+import Color.Manipulate exposing (scaleHsl)
 import Data exposing (GapminderData, GapminderEntries, GapminderSeries, WVEntries, WVWaves, WorldValuesData)
 import Datasets.Gapminder exposing (gapminderData)
 import Datasets.WVS exposing (wvsData)
@@ -19,13 +20,17 @@ import Html.Attributes as HtmlAttr
 import IntDict exposing (IntDict)
 import List.Extra
 import Maybe.Extra
+import Round
 import Scale exposing (ContinuousScale)
 import Set exposing (Set)
 import Statistics
-import TypedSvg exposing (circle, defs, g, marker, svg)
+import String exposing (fromFloat, fromInt)
+import TypedSvg exposing (circle, defs, g, marker, rect, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
-import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth)
+import TypedSvg.Attributes.InEm
+import TypedSvg.Attributes.InPx exposing (cx, cy, fontSize, r, strokeWidth)
 import TypedSvg.Core exposing (Svg, text)
+import TypedSvg.Events
 import TypedSvg.Types exposing (Paint(..), Transform(..))
 
 
@@ -65,6 +70,12 @@ type alias Model =
     , gapminderSelector : Selector GapminderData GapminderEntries
     , wvsSelector : Selector WorldValuesData WVEntries
     , timeExtrapolation : Int
+    , tooltip :
+        Maybe
+            { country : Country
+            , position : ( Float, Float )
+            , point : Point
+            }
     }
 
 
@@ -165,6 +176,7 @@ init =
     , gapminderSelector = List.head gapminderSelectors |> Maybe.withDefault { title = "", accessor = .gdp, shortLabel = "", lowLabel = "", highLabel = "" }
     , wvsSelector = List.head valuesSelectors |> Maybe.withDefault { accessor = .trustInNewPeople, title = "", shortLabel = "", lowLabel = "", highLabel = "" }
     , timeExtrapolation = 10
+    , tooltip = Nothing
     }
 
 
@@ -174,6 +186,8 @@ type Msg
     | SelectAllCountries
     | DeselectAllCountries
     | SelectWVSEntries (Selector WorldValuesData WVEntries)
+    | ShowTooltip Country ( Float, Float ) Point
+    | HideTooltip
 
 
 update : Msg -> Model -> Model
@@ -200,6 +214,12 @@ update cmd model =
 
         DeselectAllCountries ->
             { model | countries = Set.empty }
+
+        ShowTooltip country position point ->
+            { model | tooltip = Just { country = country, position = position, point = point } }
+
+        HideTooltip ->
+            { model | tooltip = Nothing }
 
 
 view : Model -> Html Msg
@@ -490,18 +510,74 @@ makeSeries wvsValues gapminderValues countries =
             )
 
 
-drawPoints : List DisplayData -> ContinuousScale Float -> ContinuousScale Float -> List (Svg Msg)
+hoverBox : ( String, String ) -> { country : Country, position : ( Float, Float ), point : Point } -> Svg Msg
+hoverBox ( wvsLabel, gapLabel ) { country, position, point } =
+    let
+        ( x, y ) =
+            position
+
+        adjustBackground =
+            scaleHsl { lightnessScale = 0.3, saturationScale = 0.3, alphaScale = -0.2 }
+
+        atRow n =
+            TypedSvg.Attributes.InEm.y (1.2 * n)
+
+        textWidth =
+            TypedSvg.Attributes.InEm.textLength 2.5
+
+        rowStart =
+            TypedSvg.Attributes.InPx.x 4
+
+        rowEnd =
+            TypedSvg.Attributes.InEm.x 10
+
+        rowEndAnchor =
+            TypedSvg.Attributes.textAnchor TypedSvg.Types.AnchorEnd
+    in
+    g [ transform [ Translate x (y - 10) ] ]
+        [ rect
+            [ TypedSvg.Attributes.fill <| Paint <| adjustBackground country.color
+            , TypedSvg.Attributes.stroke <| Paint Color.lightGrey
+            , TypedSvg.Attributes.InPx.strokeWidth 1
+            , TypedSvg.Attributes.InEm.width 5
+            , TypedSvg.Attributes.InEm.height 3
+            ]
+            []
+        , TypedSvg.text_ [ atRow 1, fontSize 9, rowStart ] [ text country.name ]
+        , TypedSvg.text_ [ atRow 2, fontSize 9, rowStart ] [ text <| wvsLabel ++ ":" ]
+        , TypedSvg.text_ [ atRow 4, fontSize 9, rowStart ] [ text <| gapLabel ++ ":" ]
+        , TypedSvg.text_ [ atRow 5, fontSize 9, rowStart ] [ text <| "year:" ]
+        , TypedSvg.text_ [ atRow 3, fontSize 9, rowEnd, rowEndAnchor ] [ text <| Round.round 4 point.wvs ]
+        , TypedSvg.text_ [ atRow 4, fontSize 9, rowEnd, rowEndAnchor ] [ text <| Round.round 4 point.gap ]
+        , TypedSvg.text_ [ atRow 5, fontSize 9, rowEnd, rowEndAnchor ] [ text <| fromInt point.t ]
+        ]
+
+
+drawPoints :
+    List DisplayData
+    -> ContinuousScale Float
+    -> ContinuousScale Float
+    -> List (Svg Msg)
 drawPoints seriesData xScale_ yScale_ =
     let
         drawPoint : Country -> Point -> Svg Msg
-        drawPoint country { wvs, gap } =
+        drawPoint country ({ wvs, gap } as point) =
+            let
+                x =
+                    Scale.convert xScale_ wvs
+
+                y =
+                    Scale.convert yScale_ gap
+            in
             circle
                 [ r 5
                 , fill <| Paint country.color
                 , stroke <| Paint Color.darkGray
                 , strokeWidth 1
-                , cx <| Scale.convert xScale_ wvs
-                , cy <| Scale.convert yScale_ gap
+                , cx <| x
+                , cy <| y
+                , TypedSvg.Events.onMouseEnter <| ShowTooltip country ( x, y ) point
+                , TypedSvg.Events.onMouseLeave <| HideTooltip
                 ]
                 []
     in
@@ -656,6 +732,9 @@ diagram model =
             drawSegments seriesData xScale_ yScale_
         , g [ transform [ Translate padding padding ], class [ "points" ] ] <|
             drawPoints seriesData xScale_ yScale_
+        , model.tooltip
+            |> Maybe.map (hoverBox ( model.wvsSelector.shortLabel, model.gapminderSelector.shortLabel ))
+            |> Maybe.withDefault (text "")
         ]
 
 
