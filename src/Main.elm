@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Axis
-import Basics.Extra exposing (inDegrees)
 import Browser
 import Color exposing (Color)
 import Color.Manipulate exposing (scaleHsl)
@@ -24,7 +23,7 @@ import Round
 import Scale exposing (ContinuousScale)
 import Set exposing (Set)
 import Statistics
-import String exposing (fromFloat, fromInt)
+import String exposing (fromInt)
 import TypedSvg exposing (circle, defs, g, marker, rect, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
 import TypedSvg.Attributes.InEm
