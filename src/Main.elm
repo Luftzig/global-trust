@@ -366,17 +366,25 @@ makeSeries wvsValues gapminderValues countries =
                     intDictRange p1.t p2.t series
 
                 minWvs =
-                    min p1.wvs p2.wvs
+                    if p1.t < p2.t then
+                        p1.wvs
+
+                    else
+                        p2.wvs
 
                 maxWvs =
-                    max p1.wvs p2.wvs
+                    if p1.t < p2.t then
+                        p2.wvs
+
+                    else
+                        p1.wvs
 
                 makePoint ( minWvs_, maxWvs_ ) ( minT, maxT ) t v =
                     let
-                        interpolate =
-                            Interpolation.float minWvs_ maxWvs_
+                        timeScale =
+                            Scale.linear ( minWvs_, maxWvs_ ) ( toFloat minT, toFloat maxT )
                     in
-                    { wvs = interpolate (toFloat (t - minT) / toFloat (abs (minT - maxT)))
+                    { wvs = Scale.convert timeScale <| toFloat t
                     , gap = v
                     , t = t
                     }
@@ -389,6 +397,8 @@ makeSeries wvsValues gapminderValues countries =
                 |> expandPoints
                 |> pairwise
                 |> List.concatMap (fillBetweenPoints gapSeries)
+                |> List.sortBy .t
+                |> Debug.log "sections"
     in
     countries
         |> Set.toList
@@ -443,7 +453,7 @@ segment relative ( x1, y1 ) ( x2, y2 ) =
             Color.toHsla baseColor
 
         scale =
-            Scale.linear  ( 0.1, 0.7 ) ( 0, 1 )
+            Scale.linear ( 0.1, 0.7 ) ( 0, 1 )
 
         segmentColor =
             Color.fromHsla { hsl | lightness = Scale.convert scale relative, alpha = 0.5 }
