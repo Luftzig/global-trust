@@ -116,11 +116,15 @@ view model =
         UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX ]
             [ UI.el [ UI.centerX, UIFont.size 24 ] <| UI.text "Global Trust"
             , UI.row []
-                [ gapminderSelector model
-                , UI.html <| diagram model
+                [ UI.column []
+                    [ UI.row []
+                        [ gapminderSelector model
+                        , UI.html <| diagram model
+                        ]
+                    , valuesSelector model
+                    ]
                 , countriesSelector model
                 ]
-            , valuesSelector model
             ]
 
 
@@ -149,6 +153,7 @@ button msg label active =
 
           else
             UIBackground.color <| UI.rgba 1.0 1.0 1.0 0.0
+        , UIFont.size 12
         ]
         { onPress = Just msg
         , label = UI.text label
@@ -168,24 +173,32 @@ gapminderSelector model =
         |> UI.column []
 
 
+countryButton : Msg -> String -> Bool -> UI.Element Msg
+countryButton msg label active =
+    UIInput.button
+        [ UIBorder.rounded 5
+        , UIBorder.color <| colorToUi Color.lightBlue
+        , UIBorder.width 2
+        , UI.padding 4
+        , if active then
+            UIBackground.color <| colorToUi Color.lightBlue
+
+          else
+            UIBackground.color <| UI.rgba 1.0 1.0 1.0 0.0
+        , UIFont.size 10
+        ]
+        { onPress = Just msg
+        , label = UI.text label
+        }
+
+
 countriesSelector { countries } =
     Dict.keys wvsYears
         |> List.map
             (\c ->
-                UIInput.button
-                    [ UIBorder.rounded 5
-                    , UIBorder.color <| colorToUi Color.lightBlue
-                    , if Set.member c countries then
-                        UIBackground.color <| colorToUi Color.lightBlue
-
-                      else
-                        UIBackground.color <| UI.rgba 1.0 1.0 1.0 0.0
-                    ]
-                    { label = UI.text c
-                    , onPress = Just <| ToggleCountry c
-                    }
+                countryButton (ToggleCountry c) c (Set.member c countries)
             )
-        |> UI.column []
+        |> UI.column [ UI.spacing 2 ]
 
 
 valuesSelectors =
@@ -430,7 +443,7 @@ segment relative ( x1, y1 ) ( x2, y2 ) =
             Color.toHsla baseColor
 
         scale =
-            Scale.linear ( 0, 1 ) ( 0.1, 0.9 )
+            Scale.linear  ( 0.1, 0.7 ) ( 0, 1 )
 
         segmentColor =
             Color.fromHsla { hsl | lightness = Scale.convert scale relative, alpha = 0.5 }
