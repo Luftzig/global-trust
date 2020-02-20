@@ -10,6 +10,11 @@ import Datasets.WVS exposing (wvsData)
 import Dict exposing (Dict)
 import Dict.Extra
 import Element as UI
+import Element.Background as UIBackground
+import Element.Border as UIBorder
+import Element.Events
+import Element.Font as UIFont
+import Element.Input as UIInput
 import Html exposing (Html)
 import Html.Attributes as HtmlAttr
 import IntDict exposing (IntDict)
@@ -18,12 +23,12 @@ import List.Extra
 import Maybe.Extra
 import Path exposing (Path)
 import Scale exposing (ContinuousScale)
-import Set
+import Set exposing (Set)
 import Shape
 import Statistics
-import TypedSvg exposing (circle, defs, g, line, marker, polygon, polyline, svg)
+import TypedSvg exposing (circle, defs, g, line, marker, svg)
 import TypedSvg.Attributes exposing (class, fill, stroke, transform, viewBox)
-import TypedSvg.Attributes.InPx as InPx exposing (cx, cy, r, strokeWidth)
+import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth)
 import TypedSvg.Core exposing (Svg)
 import TypedSvg.Types exposing (Paint(..), Transform(..))
 
@@ -45,7 +50,7 @@ type alias Country =
 
 
 type alias Countries =
-    List String
+    Set String
 
 
 type alias Model =
@@ -75,32 +80,146 @@ init : Model
 init =
     { currentSeries = gapminderData.gdp
     , currentValues = wvsData.confidenceInGovernment
-    , countries = Dict.keys wvsData.year
+    , countries = Set.fromList <| Dict.keys wvsData.year
     }
 
 
 type Msg
-    = NoOp
+    = ChangeGapminderSeries GapminderEntries
+    | ToggleCountry Country
+    | ToggleWVS WVEntries
 
 
 update : Msg -> Model -> Model
 update cmd model =
     case cmd of
-        NoOp ->
-            model
+        ChangeGapminderSeries series ->
+            { model | currentSeries = series }
+
+        ToggleCountry country ->
+            { model
+                | countries =
+                    if Set.member country model.countries then
+                        Set.remove country model.countries
+
+                    else
+                        Set.insert country model.countries
+            }
+
+        ToggleWVS wVEntries ->
+            { model | currentValues = wVEntries }
 
 
 view : Model -> Html Msg
 view model =
     UI.layout [ UI.width <| UI.fill, UI.height <| UI.fill ] <|
-        UI.row [ UI.width <| UI.fill, UI.height <| UI.fill ]
-            [ UI.html <| diagram model
+        UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX ]
+            [ UI.el [ UI.centerX, UIFont.size 24 ] <| UI.text "Global Trust"
+            , UI.row []
+                [ gapminderSelector model
+                , UI.html <| diagram model
+                , countriesSelector model
+                ]
+            , valuesSelector model
             ]
+
+
+gapminderSelectors =
+    [ { title = "Corruption Index", accessor = .corruption }
+    , { title = "GDP", accessor = .gdp }
+    , { title = "GINI Index", accessor = .gini }
+    , { title = "Murders, per 100,000", accessor = .murders }
+    , { title = "% Below Poverty", accessor = .poverty }
+    ]
+
+
+colorToUi =
+    UI.fromRgb << Color.toRgba
+
+
+button : Msg -> String -> Bool -> UI.Element Msg
+button msg label active =
+    UIInput.button
+        [ UIBorder.rounded 5
+        , UIBorder.color <| colorToUi Color.lightBlue
+        , UIBorder.width 2
+        , UI.padding 4
+        , if active then
+            UIBackground.color <| colorToUi Color.lightBlue
+
+          else
+            UIBackground.color <| UI.rgba 1.0 1.0 1.0 0.0
+        ]
+        { onPress = Just msg
+        , label = UI.text label
+        }
+
+
+gapminderSelector : Model -> UI.Element Msg
+gapminderSelector model =
+    gapminderSelectors
+        |> List.map
+            (\{ title, accessor } ->
+                button
+                    (ChangeGapminderSeries <| accessor gapminderData)
+                    title
+                    (accessor gapminderData == model.currentSeries)
+            )
+        |> UI.column []
+
+
+countriesSelector { countries } =
+    Dict.keys wvsYears
+        |> List.map
+            (\c ->
+                UIInput.button
+                    [ UIBorder.rounded 5
+                    , UIBorder.color <| colorToUi Color.lightBlue
+                    , if Set.member c countries then
+                        UIBackground.color <| colorToUi Color.lightBlue
+
+                      else
+                        UIBackground.color <| UI.rgba 1.0 1.0 1.0 0.0
+                    ]
+                    { label = UI.text c
+                    , onPress = Just <| ToggleCountry c
+                    }
+            )
+        |> UI.column []
+
+
+valuesSelectors =
+    [ { accessor = .trustInNeighbors, title = "Trust in Neighbors" }
+    , { accessor = .trustInPeopleYouKnow, title = "Trust in the People You Know" }
+    , { accessor = .trustInNewPeople, title = "Trust in People You Just Met" }
+    , { accessor = .trustInDifferentNationality, title = "Trust in People of Different Nationality" }
+    , { accessor = .trustInDifferentReligion, title = "Trust in People of Different Religion" }
+    , { accessor = .confidenceInArmedForces, title = "Confidence in the Armed Forces" }
+    , { accessor = .confidenceInChurches, title = "Confidence in Religious Institutions" }
+    , { accessor = .confidenceInMajorCompanies, title = "Confidence in Major Companies" }
+    , { accessor = .confidenceInCourts, title = "Confidence in the Courts" }
+    , { accessor = .confidenceInGovernment, title = "Confidence in the Government" }
+    , { accessor = .confidenceInParliament, title = "Confidence in the Parliament" }
+    , { accessor = .confidenceInPolice, title = "Confidence in the Police" }
+    , { accessor = .confidenceInPress, title = "Confidence in the Press" }
+    ]
+
+
+valuesSelector { currentValues } =
+    valuesSelectors
+        |> List.map
+            (\{ accessor, title } ->
+                button
+                    (ToggleWVS <| accessor wvsData)
+                    title
+                    (currentValues == accessor wvsData)
+            )
+        |> UI.wrappedRow [UI.width <| UI.fill, UI.spacing 4 ]
 
 
 selectCountries : Countries -> Dict String a -> Dict String a
 selectCountries countries =
-    Dict.Extra.keepOnly (Set.fromList countries)
+    Dict.Extra.keepOnly countries
 
 
 xScale : WVEntries -> Countries -> ContinuousScale Float
@@ -253,6 +372,7 @@ makeSeries wvsValues gapminderValues countries =
                 |> List.concatMap (fillBetweenPoints gapSeries)
     in
     countries
+        |> Set.toList
         |> List.filterMap getData
         |> List.map addPoints
         |> List.map
@@ -394,11 +514,17 @@ diagram model =
                 , viewBox 0 0 10 10
                 , TypedSvg.Attributes.refX "5"
                 , TypedSvg.Attributes.refY "5"
-                , TypedSvg.Attributes.markerWidth <| TypedSvg.Types.Px 6
-                , TypedSvg.Attributes.markerHeight <| TypedSvg.Types.Px 6
+                , TypedSvg.Attributes.markerWidth <| TypedSvg.Types.Px 3
+                , TypedSvg.Attributes.markerHeight <| TypedSvg.Types.Px 3
                 , TypedSvg.Attributes.orient "auto-start-reverse"
                 ]
-                [ TypedSvg.path [ TypedSvg.Attributes.d "M 0 0 L 10 5 L 0 10 z" ] []
+                [ TypedSvg.path
+                    [ TypedSvg.Attributes.d "M 0 0 L 10 5 L 0 10 z"
+                    , stroke <| Paint Color.white
+                    , strokeWidth 2
+                    , fill PaintNone
+                    ]
+                    []
                 ]
             ]
         , g [ transform [ Translate (padding - 1) (h - padding) ] ]

@@ -40,7 +40,7 @@ countries that also appear in WVS dataset (after some manual renaming of entries
 ** [DONE] How to visualize relations of WVS and GapMinder data in respect of time
 Use a method similar to Time Curves
 ** [DONE] Display a scatter plot
-** [TODO] Connect related samples
+** [DONE] Connect related samples
 ** [TODO] Split connecting lines to sections, one section per year
 ** [TODO] Choose different value sets and data sets
 ** [TODO] Label axes properly
