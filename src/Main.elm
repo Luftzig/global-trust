@@ -12,6 +12,7 @@ import Dict.Extra
 import Element as UI
 import Element.Background as UIBackground
 import Element.Border as UIBorder
+import Element.Events
 import Element.Font as UIFont
 import Element.Input as UIInput
 import Html exposing (Html)
@@ -75,6 +76,7 @@ type alias Model =
             , position : ( Float, Float )
             , point : Point
             }
+    , showAbout : Bool
     }
 
 
@@ -176,6 +178,7 @@ init =
     , wvsSelector = List.head valuesSelectors |> Maybe.withDefault { accessor = .trustInNewPeople, title = "", shortLabel = "", lowLabel = "", highLabel = "" }
     , timeExtrapolation = 10
     , tooltip = Nothing
+    , showAbout = False
     }
 
 
@@ -187,6 +190,8 @@ type Msg
     | SelectWVSEntries (Selector WorldValuesData WVEntries)
     | ShowTooltip Country ( Float, Float ) Point
     | HideTooltip
+    | ShowAbout
+    | HideAbout
 
 
 update : Msg -> Model -> Model
@@ -220,26 +225,178 @@ update cmd model =
         HideTooltip ->
             { model | tooltip = Nothing }
 
+        ShowAbout ->
+            { model | showAbout = True }
+
+        HideAbout ->
+            { model | showAbout = False }
+
 
 view : Model -> Html Msg
 view model =
-    UI.layout [ UI.centerX, UI.width <| UI.fill, UI.height <| UI.fill ] <|
-        UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX, UI.paddingXY 30 20 ]
-            [ UI.el [ UI.centerX,  UIFont.size 24 ] <| UI.text "Global Trust"
-            , UI.row [UI.centerX, UI.spacing 20]
-                [ UI.column [UI.width <| UI.fillPortion 5]
-                    [ UI.row [UI.width <| UI.fill]
-                        [ UI.el [UI.width <| UI.fillPortion 1] <| gapminderSelector model
-                        , UI.column [UI.centerX, UI.width <| UI.px w ]
+    UI.layout
+        [ UI.centerX
+        , UI.width <| UI.fill
+
+        --, UI.height <| UI.fill
+        ]
+    <|
+        UI.column
+            [ UI.width <| UI.fill
+
+            --, UI.height <| UI.fill
+            , UI.centerX
+            , UI.paddingXY 30 20
+            , UI.inFront <|
+                if model.showAbout then
+                    about
+
+                else
+                    UI.none
+            ]
+            [ pageTitle
+            , UI.row [ UI.centerX, UI.spacing 20 ]
+                [ UI.column [ UI.width <| UI.fillPortion 5 ]
+                    [ UI.row [ UI.width <| UI.fill ]
+                        [ UI.el [ UI.width <| UI.fillPortion 1 ] <| gapminderSelector model
+                        , UI.column [ UI.centerX, UI.width <| UI.px w ]
                             [ drawTitle model
                             , UI.el [] <| UI.html <| diagram model
                             , valuesSelector model
                             ]
                         ]
                     ]
-                , UI.el [UI.width <| UI.fillPortion 1] <| countriesSelector model
+                , UI.el [ UI.width <| UI.fillPortion 1 ] <| countriesSelector model
                 ]
             ]
+
+
+pageTitle =
+    UI.row [ UI.centerX, UIFont.size 24, UI.spacing 30 ]
+        [ UI.text "Global Trust"
+        , UIInput.button
+            [ UI.alignRight
+            , UIFont.size 12
+            , UIFont.color <| colorToUi Color.blue
+            ]
+            { label = UI.text "About", onPress = Just ShowAbout }
+        ]
+
+
+about : UI.Element Msg
+about =
+    UI.row
+        [ UI.width <| UI.fill
+
+        --, UI.height <| UI.fill
+        ]
+        [ UI.el
+            [ UI.height <| UI.fill
+            , UI.width <| UI.fillPortion 4
+            , Element.Events.onClick <| HideAbout
+            ]
+          <|
+            UI.none
+        , UI.el
+            [ UI.height <| UI.fill
+            , UI.width <| UI.fillPortion 3
+            , UI.scrollbarY
+            , UIBorder.roundEach { topLeft = 5, bottomLeft = 5, topRight = 0, bottomRight = 0 }
+            , UIBorder.widthEach { left = 2, right = 0, top = 2, bottom = 2 }
+            , UIBorder.color <| colorToUi Color.grey
+            , UIBorder.shadow { offset = ( -4, 4 ), size = 4, blur = 6, color = colorToUi Color.lightGrey }
+            , UIBackground.color <| colorToUi Color.white
+            , UI.paddingXY 15 25
+            ]
+          <|
+            UI.textColumn [ UI.spacing 10 ]
+                [ h1
+                    [ UI.text "About \"Global Trust\""
+                    , UIInput.button [ UI.alignRight ] { label = UI.text "X", onPress = Just HideAbout }
+                    ]
+                , regular
+                    [ UI.text
+                        """Global Trust is a work of information visualization which attempts to explore the relations
+            between indicators of economic development and the feeling of trust and confidence that people feel in different
+            countries overtime.
+            """
+                    ]
+                , regular [ UI.text """Created by Yoav Luft for KTH course "Information Visualization", 2020.""" ]
+                , h2 [ UI.text "Discovery process" ]
+                , regular
+                    [ UI.text """
+In the initial discovery process I wanted to explore the question "Does immigration affects the values of a country".
+I started by exploring both data sets, World Values Survey (WVS) and Gapminder (GM). This initial exploration brought
+up two problems: (A) WVS has a lot of data, so comparing values of two countries will require dimensionality reduction
+of some sort; (B) GM has no data about immigration, only about refugees.
+                """
+                    ]
+                , h2 [ UI.text "Discovery, Take II" ]
+                , regular [ UI.text """
+My second attempt at discovery was around the question "What influences the trust people give in each other and in
+public entities?". To answer that question, I've explored WVS dataset and found 6 questions regarding trust and 12
+questions regarding confidence in organizations. I've decided to look at the following possible influences: economic
+issues, violence and corruption. I found 5 GM datasets that are relevant. """ ]
+                , regular
+                    [ UI.text """
+Next, I explored the datasets using Pandas, and plot several relationships. I've also considered the question of
+temporality: WVS data is divided to 4 year waves, while GM is annual. Fig 1. shows exploration of the impact of
+aggregating GM time series to chunks corresponding to waves. """
+                    , figure "gini_correlated_years.png" "Fig 1. Gini Index scatter-matrix showing point per country for each year. We can see that adjacent years are strongly correlated."
+                    ]
+                , regular
+                    [ UI.text """
+After some research, I decided to approach the question of displaying temporal relationships by using a method inspired
+by Time-Curves """
+                    , UI.text """[Bach et al. 2015]"""
+                    , UI.text """. But in my case I had to deal with holes in the data: For every country and WVS
+question, I had only two points of data, but for GM I had many. I decided to interpolate the data between points for
+which there is both WVS and GM data, and extrapolate based on GM for years outside WVS samples. Fig. 2 and 3 shows
+explorations of displaying data from two dimensions + time, and for using time-curves inspired design. """
+                    , figure "sketch-1.png" "Fig. 2 Exploring the projection of lines interpolated between two data points on 3 dimensions."
+                    , figure "sketch-2.png" "Fig. 3 Exploring simplifications of time-curves with interpolated and extrapolated segments."
+                    ]
+                , h2 [ UI.text "Learning" ]
+                , regular [ UI.text """
+I can divide my learning into several aspects: Technically, I've learned to use elm-visualization, and I'm more strongly
+convinced now that Elm is the best thing for the web, ever, although it is still young and not as feature rich as other
+frameworks. On the visualization side, I had explored several ideas for connecting multi-dimensional data and time,
+but I would have liked to explore more. On the data side, I did not come into any conclusions. There seems to be, for
+example, some relation between corruption and lack of trust, but corruption didn't seem to influence confidence in the
+government. If I had the time, I would have wanted to explore more relationships, maybe through scatter-plot matrices,
+or user defined aggregations.""" ]
+                , h2 [ UI.text "Bibliography" ]
+                , regular
+                    [ UI.text "Bach B, Shi C, Heulot N, Madhyastha T, Grabowski T, Dragicevic P."
+                    , UI.el [ UIFont.italic ] <| UI.text "Time Curves: Folding Time to Visualize Patterns of Temporal Evolution "
+                    , UI.text "in Data. IEEE Trans Visual Comput Graphics. 2016 Jan 31;22(1):559–68. "
+                    , UI.newTabLink [ UIFont.underline, UIFont.color <| colorToUi Color.darkBlue ]
+                        { url = "https://aviz.fr/~bbach/timecurves/", label = UI.text "Time-Curves website" }
+                    ]
+                ]
+        ]
+
+
+h1 text =
+    UI.paragraph [ UIFont.size 22, UIFont.bold ] text
+
+
+h2 text =
+    UI.paragraph [ UIFont.size 18, UIFont.bold ] text
+
+
+regular text =
+    UI.paragraph [ UIFont.size 12 ] text
+
+
+figure src text =
+    UI.column [ UI.spacing 8, UI.padding 12, UI.width <| UI.shrink ]
+        [ UI.image [ UI.width <| UI.fill ]
+            { src = src
+            , description = text
+            }
+        , UI.el [ UIFont.size 12, UIFont.bold, UI.centerX ] <| UI.text text
+        ]
 
 
 colorToUi =
@@ -520,9 +677,6 @@ hoverBox ( wvsLabel, gapLabel ) { country, position, point } =
 
         atRow n =
             TypedSvg.Attributes.InEm.y (1.2 * n)
-
-        textWidth =
-            TypedSvg.Attributes.InEm.textLength 2.5
 
         rowStart =
             TypedSvg.Attributes.InPx.x 4
