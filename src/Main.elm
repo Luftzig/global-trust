@@ -223,21 +223,21 @@ update cmd model =
 
 view : Model -> Html Msg
 view model =
-    UI.layout [ UI.width <| UI.fill, UI.height <| UI.fill ] <|
-        UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX, UI.padding 5 ]
-            [ UI.el [ UI.centerX, UIFont.size 24 ] <| UI.text "Global Trust"
-            , UI.row []
-                [ UI.column []
-                    [ UI.row []
-                        [ gapminderSelector model
-                        , UI.column []
+    UI.layout [ UI.centerX, UI.width <| UI.fill, UI.height <| UI.fill ] <|
+        UI.column [ UI.width <| UI.fill, UI.height <| UI.fill, UI.centerX, UI.paddingXY 30 20 ]
+            [ UI.el [ UI.centerX,  UIFont.size 24 ] <| UI.text "Global Trust"
+            , UI.row [UI.centerX, UI.spacing 20]
+                [ UI.column [UI.width <| UI.fillPortion 5]
+                    [ UI.row [UI.width <| UI.fill]
+                        [ UI.el [UI.width <| UI.fillPortion 1] <| gapminderSelector model
+                        , UI.column [UI.centerX, UI.width <| UI.px w ]
                             [ drawTitle model
-                            , UI.html <| diagram model
+                            , UI.el [] <| UI.html <| diagram model
                             , valuesSelector model
                             ]
                         ]
                     ]
-                , countriesSelector model
+                , UI.el [UI.width <| UI.fillPortion 1] <| countriesSelector model
                 ]
             ]
 
@@ -282,7 +282,7 @@ gapminderSelector model =
                     title
                     (title == model.gapminderSelector.title)
             )
-        |> UI.column [ UI.spacing 4 ]
+        |> UI.column [ UI.spacing 4, UI.alignRight ]
 
 
 countryButton : Msg -> Country -> Bool -> UI.Element Msg
