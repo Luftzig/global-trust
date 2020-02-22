@@ -342,8 +342,8 @@ issues, violence and corruption. I found 5 GM datasets that are relevant. """ ]
 Next, I explored the datasets using Pandas, and plot several relationships. I've also considered the question of
 temporality: WVS data is divided to 4 year waves, while GM is annual. Fig 1. shows exploration of the impact of
 aggregating GM time series to chunks corresponding to waves. """
-                    , figure "gini_correlated_years.png" "Fig 1. Gini Index scatter-matrix showing point per country for each year. We can see that adjacent years are strongly correlated."
                     ]
+                , figure "gini_correlated_years.png" "Fig 1. Gini Index scatter-matrix showing point per country for each year. We can see that adjacent years are strongly correlated."
                 , regular
                     [ UI.text """
 After some research, I decided to approach the question of displaying temporal relationships by using a method inspired
@@ -353,9 +353,9 @@ by Time-Curves """
 question, I had only two points of data, but for GM I had many. I decided to interpolate the data between points for
 which there is both WVS and GM data, and extrapolate based on GM for years outside WVS samples. Fig. 2 and 3 shows
 explorations of displaying data from two dimensions + time, and for using time-curves inspired design. """
-                    , figure "sketch-1.png" "Fig. 2 Exploring the projection of lines interpolated between two data points on 3 dimensions."
-                    , figure "sketch-2.png" "Fig. 3 Exploring simplifications of time-curves with interpolated and extrapolated segments."
                     ]
+                , figure "sketch-1.png" "Fig. 2 Exploring the projection of lines interpolated between two data points on 3 dimensions."
+                , figure "sketch-2.png" "Fig. 3 Exploring simplifications of time-curves with interpolated and extrapolated segments."
                 , h2 [ UI.text "Learning" ]
                 , regular [ UI.text """
 I can divide my learning into several aspects: Technically, I've learned to use elm-visualization, and I'm more strongly
@@ -386,7 +386,7 @@ h2 text =
 
 
 regular text =
-    UI.paragraph [ UIFont.size 12 ] text
+    UI.paragraph [ UIFont.size 12, UIFont.justify ] text
 
 
 figure src text =
@@ -395,7 +395,7 @@ figure src text =
             { src = src
             , description = text
             }
-        , UI.el [ UIFont.size 12, UIFont.bold, UI.centerX ] <| UI.text text
+        , UI.paragraph [ UIFont.size 12, UIFont.bold, UI.centerX ] [ UI.text text ]
         ]
 
 
