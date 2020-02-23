@@ -287,6 +287,7 @@ about : UI.Element Msg
 about =
     UI.row
         [ UI.width <| UI.fill
+        , UI.htmlAttribute <| HtmlAttr.class "menu"
 
         --, UI.height <| UI.fill
         ]
@@ -370,11 +371,25 @@ or user defined aggregations.""" ]
                     [ UI.text "Bach B, Shi C, Heulot N, Madhyastha T, Grabowski T, Dragicevic P."
                     , UI.el [ UIFont.italic ] <| UI.text "Time Curves: Folding Time to Visualize Patterns of Temporal Evolution "
                     , UI.text "in Data. IEEE Trans Visual Comput Graphics. 2016 Jan 31;22(1):559–68. "
-                    , UI.newTabLink [ UIFont.underline, UIFont.color <| colorToUi Color.darkBlue ]
-                        { url = "https://aviz.fr/~bbach/timecurves/", label = UI.text "Time-Curves website" }
+                    , link "https://aviz.fr/~bbach/timecurves/" (UI.text "Time-Curves website")
+                    ]
+                , smallPrints
+                    [ UI.text "Created by Yoav Luft, 2020. Released under "
+                    , link "https://www.gnu.org/licenses/gpl-3.0.en.html" (UI.text "GPL v3")
+                    , UI.text ", "
+                    , link "https://github.com/Luftzig/global-trust" (UI.text "source code")
+                    , UI.text ". Created using "
+                    , link "https://elm-lang.org/" (UI.text "Elm")
+                    , UI.text ", with Jakub Hampl's "
+                    , link "https://elm-visualization.netlify.com/" (UI.text "elm-visualization package")
+                    , UI.text " for creating the diagram. Many other great packages were used, take a look at elm.json for a complete list."
                     ]
                 ]
         ]
+
+
+link url label =
+    UI.newTabLink [ UIFont.underline, UIFont.color <| colorToUi Color.darkBlue ] { url = url, label = label }
 
 
 h1 text =
@@ -387,6 +402,10 @@ h2 text =
 
 regular text =
     UI.paragraph [ UIFont.size 12, UIFont.justify ] text
+
+
+smallPrints text =
+    UI.paragraph [ UIFont.size 10, UIFont.justify ] text
 
 
 figure src text =

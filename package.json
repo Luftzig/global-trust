@@ -1,10 +1,10 @@
 {
-  "name": "GlobalTrust",
+  "name": "global-trust",
   "version": "1.0.0",
   "description": "Visualization Project showing relationship between poverty, violance and corruption with trust of institutions.",
   "main": "src/index.js",
-  "author": "Yoav Luft <luft@kth.se>",
-  "license": "MIT",
+  "author": "Yoav Luft <luft@kth.se>, <yoav.luft@gmail.com>",
+  "license": "GPL-3.0-or-later",
   "dependencies": {},
   "scripts": {
     "start": "parcel src/index.html",
