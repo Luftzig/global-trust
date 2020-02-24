@@ -19,6 +19,7 @@
             "elm-community/typed-svg": "6.0.0",
             "folkertdev/one-true-path-experiment": "4.0.3",
             "gampleman/elm-visualization": "2.1.1",
+            "mdgriffith/elm-style-animation": "4.0.0",
             "mdgriffith/elm-ui": "1.1.5",
             "myrho/elm-round": "1.0.4",
             "noahzgordon/elm-color-extra": "1.0.2"

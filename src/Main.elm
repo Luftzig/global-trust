@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import Animation
 import Axis
 import Browser
 import Color exposing (Color)
@@ -76,7 +77,7 @@ type alias Model =
             , position : ( Float, Float )
             , point : Point
             }
-    , showAbout : Bool
+    , aboutAnimation : Animation.State
     }
 
 
@@ -171,6 +172,11 @@ allCountries =
     ]
 
 
+noCmd : a -> ( a, Cmd Msg )
+noCmd v =
+    ( v, Cmd.none )
+
+
 init : Model
 init =
     { countries = Set.fromList <| Dict.keys wvsData.year
@@ -178,7 +184,9 @@ init =
     , wvsSelector = List.head valuesSelectors |> Maybe.withDefault { accessor = .trustInNewPeople, title = "", shortLabel = "", lowLabel = "", highLabel = "" }
     , timeExtrapolation = 10
     , tooltip = Nothing
-    , showAbout = False
+    , aboutAnimation =
+        Animation.style
+            [ Animation.translate (Animation.percent 100) (Animation.percent 0) ]
     }
 
 
@@ -192,83 +200,102 @@ type Msg
     | HideTooltip
     | ShowAbout
     | HideAbout
+    | Animate Animation.Msg
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update cmd model =
     case cmd of
         SelectGapminderEntries selector ->
-            { model | gapminderSelector = selector }
+            noCmd { model | gapminderSelector = selector }
 
         ToggleCountry country ->
-            { model
-                | countries =
-                    if Set.member country.name model.countries then
-                        Set.remove country.name model.countries
+            noCmd
+                { model
+                    | countries =
+                        if Set.member country.name model.countries then
+                            Set.remove country.name model.countries
 
-                    else
-                        Set.insert country.name model.countries
-            }
+                        else
+                            Set.insert country.name model.countries
+                }
 
         SelectWVSEntries selector ->
-            { model | wvsSelector = selector }
+            noCmd { model | wvsSelector = selector }
 
         SelectAllCountries ->
-            { model | countries = Set.fromList <| List.map .name allCountries }
+            noCmd { model | countries = Set.fromList <| List.map .name allCountries }
 
         DeselectAllCountries ->
-            { model | countries = Set.empty }
+            noCmd { model | countries = Set.empty }
 
         ShowTooltip country position point ->
-            { model | tooltip = Just { country = country, position = position, point = point } }
+            noCmd { model | tooltip = Just { country = country, position = position, point = point } }
 
         HideTooltip ->
-            { model | tooltip = Nothing }
+            noCmd { model | tooltip = Nothing }
 
         ShowAbout ->
-            { model | showAbout = True }
+            noCmd
+                { model
+                    | aboutAnimation =
+                        Animation.interrupt
+                            [ Animation.to [ Animation.translate (Animation.percent 0) (Animation.px 0) ]
+                            ]
+                            model.aboutAnimation
+                }
 
         HideAbout ->
-            { model | showAbout = False }
+            noCmd
+                { model
+                    | aboutAnimation =
+                        Animation.interrupt
+                            [ Animation.to [ Animation.translate (Animation.percent 100) (Animation.px 0) ] ]
+                            model.aboutAnimation
+                }
+
+        Animate msg ->
+            noCmd { model | aboutAnimation = Animation.update msg model.aboutAnimation }
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    UI.layout
-        [ UI.centerX
-        , UI.width <| UI.fill
+    let
+        body =
+            UI.layout
+                [ UI.centerX
+                , UI.width <| UI.fill
 
-        --, UI.height <| UI.fill
-        ]
-    <|
-        UI.column
-            [ UI.width <| UI.fill
+                --, UI.height <| UI.fill
+                ]
+            <|
+                UI.column
+                    [ UI.width <| UI.fill
 
-            --, UI.height <| UI.fill
-            , UI.centerX
-            , UI.paddingXY 30 20
-            , UI.inFront <|
-                if model.showAbout then
-                    about
-
-                else
-                    UI.none
-            ]
-            [ pageTitle
-            , UI.row [ UI.centerX, UI.spacing 20 ]
-                [ UI.column [ UI.width <| UI.fillPortion 5 ]
-                    [ UI.row [ UI.width <| UI.fill ]
-                        [ UI.el [ UI.width <| UI.fillPortion 1 ] <| gapminderSelector model
-                        , UI.column [ UI.centerX, UI.width <| UI.px w ]
-                            [ drawTitle model
-                            , UI.el [] <| UI.html <| diagram model
-                            , valuesSelector model
+                    --, UI.height <| UI.fill
+                    , UI.centerX
+                    , UI.paddingXY 30 20
+                    , UI.inFront <| about model.aboutAnimation
+                    ]
+                    [ pageTitle
+                    , UI.row [ UI.centerX, UI.spacing 20 ]
+                        [ UI.column [ UI.width <| UI.fillPortion 5 ]
+                            [ UI.row [ UI.width <| UI.fill ]
+                                [ UI.el [ UI.width <| UI.fillPortion 1 ] <| gapminderSelector model
+                                , UI.column [ UI.centerX, UI.width <| UI.px w ]
+                                    [ drawTitle model
+                                    , UI.el [] <| UI.html <| diagram model
+                                    , valuesSelector model
+                                    ]
+                                ]
                             ]
+                        , UI.el [ UI.width <| UI.fillPortion 1 ] <| countriesSelector model
                         ]
                     ]
-                , UI.el [ UI.width <| UI.fillPortion 1 ] <| countriesSelector model
-                ]
-            ]
+    in
+    { title = "Global Trust - On Trust and Quality of Life"
+    , body = [ body ]
+    }
 
 
 pageTitle =
@@ -283,14 +310,16 @@ pageTitle =
         ]
 
 
-about : UI.Element Msg
-about =
+about : Animation.State -> UI.Element Msg
+about animation =
     UI.row
-        [ UI.width <| UI.fill
-        , UI.htmlAttribute <| HtmlAttr.class "menu"
+        (List.map UI.htmlAttribute (Animation.render animation)
+            ++ [ UI.width <| UI.fill
+               , UI.htmlAttribute <| HtmlAttr.class "menu"
 
-        --, UI.height <| UI.fill
-        ]
+               --, UI.height <| UI.fill
+               ]
+        )
         [ UI.el
             [ UI.height <| UI.fill
             , UI.width <| UI.fillPortion 4
@@ -911,8 +940,9 @@ diagram model =
 
 
 main =
-    Browser.sandbox
-        { init = init
+    Browser.document
+        { init = \() -> noCmd init
         , update = update
         , view = view
+        , subscriptions = \model -> Animation.subscription Animate [ model.aboutAnimation ]
         }
